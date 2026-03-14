@@ -28,6 +28,7 @@ model Ingredient {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   BillOfMaterial  BillOfMaterial[]
+  WasteLog        WasteLog[]
 }
 
 model MenuItem {
@@ -84,3 +85,23 @@ model OrderItem {
   order      Order    @relation(fields: [orderId], references: [id])
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
 }
+
+model WasteLog {
+  id           Int      @id @default(autoincrement())
+  ingredientId Int
+  quantity     Float
+  reason       String   // e.g. "Spillage", "Burnt", "Spoiled"
+  loggedBy     Int?     // User ID of the Chef/Manager who logged it
+  createdAt    DateTime @default(now())
+
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+}
+
+model Alert {
+  id           Int      @id @default(autoincrement())
+  type         String   // e.g. "LOW_STOCK", "FATIGUE", "WAIT_TIME"
+  message      String
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+

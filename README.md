@@ -75,6 +75,6 @@ npm run dev
 ---
 
 ## 📋 Roadmap (Next Phases)
-- [ ] **Phase 3:** Create the KDS (Kitchen Display System) UI dashboard for chefs to accept and complete incoming tablet orders.
-- [ ] **Phase 4:** Create the Waiter Notification Logstics (Room System) view with Green and Yellow actionable alerts.
-- [ ] **Phase 5:** Build out the Admin Financial Reporting dashboard with Gross Margins calculation (Revenue vs. True BOM Cost).
+- [x] **Phase 3:** Create the KDS (Kitchen Display System) UI dashboard for chefs to accept and complete incoming tablet orders.
+- [x] **Phase 4:** Create the Waiter Notification Logstics (Room System) view with Green and Yellow actionable alerts.
+- [x] **Phase 5:** Build out the Admin Financial Reporting dashboard with Gross Margins calculation (Revenue vs. True BOM Cost).

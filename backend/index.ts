@@ -205,6 +205,133 @@ app.put('/api/orders/:id/status', async (req, res) => {
 });
 
 
+// ==========================================
+// 4. KITCHEN DISPLAY SYSTEM (KDS) FEED
+// ==========================================
+app.get('/api/kds', async (req, res) => {
+  try {
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        status: { in: ['QUEUED', 'IN_PROGRESS'] }
+      },
+      include: {
+        items: {
+          include: { menuItem: true }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json(activeOrders);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load KDS feed' });
+  }
+});
+
+// ==========================================
+// 5. INVENTORY & WASTE LOG ENGINE
+// ==========================================
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const inventory = await prisma.ingredient.findMany({
+      orderBy: { name: 'asc' }
+    });
+
+    // Check for alerts
+    const alerts = [];
+    for (const item of inventory) {
+      if (item.currentStock <= item.minimumReorder) {
+        alerts.push({
+          type: 'LOW_STOCK',
+          message: `${item.name} is running low! (${item.currentStock} ${item.unit} remaining, Min: ${item.minimumReorder})`
+        });
+      }
+    }
+
+    res.json({ inventory, alerts });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load inventory' });
+  }
+});
+
+app.post('/api/inventory/waste', async (req, res) => {
+  const { ingredientId, quantity, reason, loggedBy } = req.body;
+
+  try {
+    const transaction = await prisma.$transaction([
+      prisma.wasteLog.create({
+        data: {
+          ingredientId,
+          quantity,
+          reason,
+          loggedBy
+        }
+      }),
+      prisma.ingredient.update({
+        where: { id: ingredientId },
+        data: { currentStock: { decrement: quantity } }
+      })
+    ]);
+
+    io.emit('dashboard_update', { event: 'waste_logged', ingredientId });
+    res.json({ success: true, log: transaction[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to log waste' });
+  }
+});
+
+// ==========================================
+// 6. ANALYTICS & FINANCIAL REPORTING
+// ==========================================
+app.get('/api/analytics/financials', async (req, res) => {
+  try {
+    const completedOrders = await prisma.order.findMany({
+      where: { status: 'COMPLETED' },
+      include: {
+        items: {
+          include: {
+            menuItem: {
+              include: {
+                BillOfMaterial: { include: { ingredient: true } }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    let totalRevenue = 0;
+    let totalFoodCost = 0;
+
+    for (const order of completedOrders) {
+      totalRevenue += order.totalAmount;
+      
+      for (const item of order.items) {
+        let itemCost = 0;
+        for (const bom of item.menuItem.BillOfMaterial) {
+          // Calculate precise food cost
+          // Cost = (Required Qty / 1000g) * Unit Cost (if Unit Cost is per 1000g, or direct conversion)
+          // Simplified: quantity * unitCost
+          itemCost += (bom.quantity * bom.ingredient.unitCost);
+        }
+        totalFoodCost += (itemCost * item.quantity);
+      }
+    }
+
+    const grossMargin = totalRevenue - totalFoodCost;
+    const marginPercentage = totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0;
+
+    res.json({
+      revenue: totalRevenue,
+      foodCost: totalFoodCost,
+      grossMargin,
+      marginPercentage: marginPercentage.toFixed(2) + '%'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to compute analytics' });
+  }
+});
+
+
 // Health Route for Testing
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', component: 'ERP Core Engine v2' });

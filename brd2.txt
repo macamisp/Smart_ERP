@@ -1,0 +1,418 @@
+Smart Restaurant ERP — Kitchen & Inventory BRD — v2.0 — Confidential
+Page 1
+Smart Restaurant ERP
+Business Requirements Document • Version 2.0 •
+Project Title
+Smart Restaurant ERP Advanced Kitchen & Inventory Module
+Document Type
+Business Requirements Document (BRD)
+Version
+2.0 High-Level Specification
+Status
+Final Draft
+Classification
+Confidential Internal Use Only
+1. Executive Summary
+This document defines the business and functional requirements for the Advanced Kitchen & Inventory Module of
+the Smart Restaurant ERP system. The objective of this module is to automate the end-to-end food production
+cycle within the restaurant, replacing manual tracking with a data-driven, real-time operational platform.
+By integrating a Bill of Materials (BOM) for every menu item, the system will ensure real-time inventory depletion,
+accurate food costing, and optimised kitchen workflows. Every order placed via the guest tablet will be directly
+linked to raw material stock levels, kitchen display assignments, and chef performance metrics creating a fully
+connected production environment.
+Core Business Objectives
+•
+Automate raw material depletion from stock on every completed order.
+•
+Provide real-time food costing per menu item through BOM-linked pricing.
+•
+Optimise kitchen workflows and protect staff welfare through order throttling and fatigue monitoring.
+•
+Deliver end-of-day reconciliation reports comparing system-expected stock versus physical inventory
+counts.
+2. Multi-Tier Menu & Pricing Architecture
+The system shall support a dynamic, BOM-linked menu where each item is defined by portion size, price,
+preparation time, and a precise ingredient specification. This forms the foundational data structure for all inventory
+automation and food costing logic.
+Each menu item’s BOM is the authoritative source for:
+•
+Real-time raw material depletion when an order is marked as completed.
+•
+Ingredient cost calculation per portion for food costing reports.
+•
+Low-stock threshold alerts based on projected consumption.
+Smart Restaurant ERP — Kitchen & Inventory BRD — v2.0 — Confidential
+Page 2
+3. Menu Catalogue & Bill of Materials (BOM)
+The following table defines all current menu items with their respective sizes, prices (LKR), preparation times, and
+ingredient specifications per portion. The BOM quantities listed are the authoritative values used by the inventory
+depletion engine.
+#
+Menu Item
+Size
+Price (LKR)
+Prep
+Time
+Ingredients & BOM Quantities
+01
+Chicken Fried Rice
+S / M / L
+800 / 1,400 /
+2,200
+15
+mins
+Basmathi Rice (150g/300g/500g), Chicken (100g/200g/350g), Egg, Carrot, Leeks, Oil
+(20ml)
+02
+Egg Koththu
+S / M / L
+600 / 1,000 /
+1,800
+12
+mins
+Parata (2/4/7 pcs), Eggs (2/3/5), Cabbage, Carrot, Onion, Gravy (100ml)
+03
+Chicken Koththu
+S / M / L
+850 / 1,500 /
+2,600
+15
+mins
+Parata (2/4/7 pcs), Chicken Curry (150g/300g/500g), Eggs, Vegetables, Gravy
+04
+Chicken Biriyani
+S / M / L
+950 / 1,700 /
+2,800
+20
+mins
+Biriyani Rice (200g/400g/600g), Chicken Leg/Breast, Cashew, Raisins, Egg, Pickle
+05
+Sawan (Chicken)
+Family
+8,500
+45
+mins
+Rice (1.5kg), Whole Chicken (8 pcs), 4 Eggs, Malay Pickle, Green Peas, Cashew
+06
+Sea Food Rice
+S / M / L
+1,200 / 2,200 /
+3,800
+18
+mins
+Rice (200g/400g/600g), Prawns (50g/100g/200g), Cuttlefish (50g/100g/200g), Fish,
+Butter
+07
+Sea Food Koththu
+S / M / L
+1,300 / 2,400 /
+4,000
+20
+mins
+Parata (2/4/7 pcs), Prawns, Cuttlefish, Mix Seafood Gravy, Vegetables, Eggs
+08
+Mixed Noodles
+S / M / L
+900 / 1,600 /
+2,800
+15
+mins
+Noodles (150g/300g/500g), Chicken, Prawns, Eggs, Carrot, Leeks, Soy Sauce
+09
+Fruit Juice (Mix)
+Normal
+550
+5 mins
+Seasonal Fruits (150g), Sugar (20g), Water/Ice, Lime Juice
+10
+Milkshake
+Normal
+750
+7 mins
+Fresh Milk (200ml), Ice Cream (2 scoops), Syrup (30ml), Sugar
+Note: BOM quantities are per portion size in order S / M / L. Single values apply to Normal or Family portions. All quantities are the authoritative values used by
+the inventory depletion engine.
+Smart Restaurant ERP — Kitchen & Inventory BRD — v2.0 — Confidential
+Page 3
+4. Functional Requirements
+4.1 Inventory Automation & Real-Time Stock Depletion
+When an order is marked as completed by the Kitchen Display System (KDS), the system must automatically
+deduct the exact BOM quantities for each item and portion size from the warehouse/store inventory. No manual
+intervention is required.
+Requirement
+Detail
+Trigger Event
+Order status set to ‘Completed’ by the KDS or kitchen staff.
+Depletion Logic
+System reads the BOM for the ordered item and portion size, then deducts
+exact ingredient quantities from corresponding stock records.
+Multi-Item Orders
+Where a single order contains multiple menu items, BOM deductions for all
+items must be processed as a single atomic transaction.
+Low-Stock Alerts
+When any ingredient falls below its Minimum Re-order Level (MRL), the system
+triggers automated alerts via Push Notification and/or SMS to the designated
+Purchasing Manager.
+Waste / Spillage
+Chefs must be able to log Spillage or Burnt Food events via the KDS interface.
+Each entry deducts the specified quantities from stock and records the reason,
+keeping physical and system inventory synchronised.
+4.2 Guest Tablet & Order Flow Integration
+Requirement
+Detail
+Order Placement
+Orders placed via the guest tablet must be transmitted to the KDS in under
+500ms.
+Availability Check
+Before confirming an order, the system must verify that sufficient stock exists
+for all BOM ingredients. If stock is insufficient, the item must be flagged as
+unavailable on the guest tablet.
+Real-Time Menu
+The guest tablet menu must reflect live stock availability — items with
+insufficient raw materials are automatically greyed out or marked ‘Unavailable’.
+4.3 Kitchen Performance & Staff Welfare
+The system tracks the operational health of the kitchen and its staff to prevent overload and ensure compliance
+with mandatory rest requirements.
+Feature
+Requirement Detail
+Order Throttling
+If a Chef is assigned more than 5 active concurrent orders, the system sends
+an immediate notification to the Manager to re-assign orders or temporarily
+pause new order assignments to that Chef. This prevents burnout and ensures
+output quality.
+Fatigue Monitoring
+The system tracks continuous on-clock hours for all kitchen staff. When a staff
+Smart Restaurant ERP — Kitchen & Inventory BRD — v2.0 — Confidential
+Page 4
+member approaches the mandatory break threshold (configurable, default: 4
+hours continuous), the system alerts the Manager.
+Chef Assignment
+Managers must be able to manually re-assign active orders between chefs via
+the management dashboard without disrupting the order’s KDS display.
+After-Service Review
+An automated end-of-day report must be generated comparing Expected Stock
+(system-calculated based on orders processed) versus Physical Stock (manual
+count entered by staff). Discrepancies are highlighted and attributed to waste
+log entries where applicable.
+4.4 Administrative & Analytics Dashboard
+Feature
+Requirement Detail
+Live KDS View
+Real-time display of all active orders per chef, with order status (Queued, In
+Progress, Completed), elapsed time, and priority flags.
+Inventory Dashboard
+Live view of all ingredient stock levels, colour-coded by status: Sufficient
+(green), Approaching MRL (amber), Below MRL (red).
+Food Costing Reports
+Monthly reports comparing revenue per menu item against total ingredient cost
+(derived from BOM quantities × unit cost). Gross margin per item must be
+calculated and displayed.
+Waste Log Reports
+Summary of all spillage and waste events by date, chef, and ingredient type.
+Used to identify patterns and reduce avoidable losses.
+Staff Hours Report
+Daily and weekly summary of kitchen staff hours, breaks taken, and orders
+processed per chef. Exported as PDF or CSV.
+5. Business Logic & System Workflow
+The following table defines the end-to-end operational flow from guest order placement to inventory depletion.
+Every stage is automated with no manual intervention required.
+Step
+Stage
+Actor / Action
+System Logic
+01
+Order Entry
+Guest selects items and
+submits order via tablet.
+System checks BOM stock availability.
+Unavailable items are blocked. Order is
+transmitted to KDS in under 500ms.
+02
+KDS Display
+Kitchen Display shows the
+order assigned to the
+relevant Chef.
+System checks Chef’s active order count. If ≥5
+orders, Manager is notified immediately.
+03
+Preparation
+Chef prepares the dish and
+updates status to In
+Progress.
+Timer starts. Preparation time is tracked against
+the BOM-defined target prep time.
+04
+Completion
+Chef marks order as
+Completed on the KDS.
+BOM quantities for all items are atomically
+deducted from stock. Low-stock checks are run.
+Waste events may be logged at this stage.
+05
+End of Day
+Manager enters physical
+System generates the Expected vs Physical Stock
+Smart Restaurant ERP — Kitchen & Inventory BRD — v2.0 — Confidential
+Page 5
+stock count into the system.
+reconciliation report. Discrepancies are flagged for
+review.
+6. Non-Functional Requirements
+Category
+Requirement
+Target
+Acceptance Criteria
+Performance
+Order-to-KDS
+Latency
+< 500 ms
+Order data from guest tablet must appear
+on KDS in under 500ms under normal
+operating load.
+Performance
+BOM Depletion
+Processing
+< 2 seconds
+Inventory deduction must complete within
+2 seconds of an order being marked
+Completed.
+Availability
+System Uptime
+99.5% (service
+hours)
+The ERP must remain available
+throughout all service periods.
+Maintenance windows scheduled outside
+operating hours only.
+Scalability
+Concurrent Orders
+50+ simultaneous
+System must handle 50+ concurrent active
+orders across all tables without
+performance degradation.
+Data Integrity
+Inventory Accuracy
+Zero silent failures
+BOM depletion transactions must be
+atomic. If any deduction fails, the full
+transaction must roll back and an alert
+raised.
+Usability
+KDS & Tablet
+Interface
+No training
+required
+Kitchen staff must be able to operate the
+KDS after a single 30-minute onboarding
+session.
+Reporting
+Food Costing
+Reports
+Monthly, auto-
+generated
+Monthly food costing reports (Revenue vs
+Ingredient Cost, gross margin per item)
+generated automatically and delivered via
+email.
+Smart Restaurant ERP — Kitchen & Inventory BRD — v2.0 — Confidential
+Page 6
+7. Technical Requirements
+The following technical specifications must be adhered to by the development team.
+Technical Area
+Specification
+Database
+•
+Must use a Relational Database (SQL) to correctly handle the one-to-many
+relationship between Menu Items and Ingredients.
+•
+BOM data must be stored as structured relational records (not flat text) to
+support accurate depletion queries.
+•
+Recommended: PostgreSQL or MySQL.
+Real-Time Messaging
+•
+Order events between the Tablet, ERP server, and KDS must use a low-
+latency messaging protocol (e.g., WebSockets or MQTT).
+•
+End-to-end order transmission latency must remain below 500ms.
+API Architecture
+•
+All modules (Tablet, KDS, Admin Dashboard) must communicate via a
+RESTful API or GraphQL interface.
+•
+APIs must be versioned to allow future module upgrades without breaking
+existing integrations.
+Reporting Engine
+•
+Monthly food costing reports must be generated automatically by the system.
+•
+Reports must calculate: Total Revenue per item, Total Ingredient Cost per item
+(BOM qty × unit cost), and Gross Margin.
+•
+Export formats: PDF and CSV.
+Access Control
+•
+Role-Based Access Control (RBAC) must be implemented.
+•
+Roles required: Guest (read-only tablet), Chef (KDS operations), Manager (full
+operational view), Administrator (system configuration).
+8. Assumptions & Constraints
+8.1 Assumptions
+•
+Guest tablets are provided by the restaurant on a fixed, managed network.
+•
+Kitchen Display Systems are wall-mounted units with stable local network connectivity.
+•
+Unit costs for all ingredients will be configured by the Administrator during system setup and updated as
+procurement prices change.
+•
+Physical stock counts for end-of-day reconciliation are performed by a designated staff member each
+evening.
+•
+The BOM ingredient quantities listed in Section 3 are accurate as of document date; menu changes
+require a formal BOM update process.
+8.2 Constraints
+•
+Version 2.0 covers a single restaurant location; multi-branch centralised inventory is out of scope.
+•
+Payment processing and POS integration are out of scope for this module.
+•
+The system does not manage supplier procurement or purchase orders in v2.0; it raises alerts only.
+•
+Menu items and BOM configurations can only be modified by users with Administrator role access.
+Smart Restaurant ERP — Kitchen & Inventory BRD — v2.0 — Confidential
+Page 7
+9. Glossary
+Term
+Definition
+BOM
+Bill of Materials — the precise list of ingredients and quantities required to produce
+one portion of a menu item.
+KDS
+Kitchen Display System — the screen mounted in the kitchen that receives and
+displays active orders for kitchen staff.
+MRL
+Minimum Re-order Level — the stock quantity threshold below which an automated
+low-stock alert is triggered.
+ERP
+Enterprise Resource Planning — an integrated system managing all core business
+operations (inventory, orders, staff, reporting) on a single platform.
+Depletion
+The automatic reduction of raw ingredient stock levels in the system following a
+completed order, based on BOM quantities.
+Waste Log
+A record entered by kitchen staff to account for food that was spoiled, burnt, or spilled,
+keeping system inventory aligned with physical stock.
+Food Costing
+The calculation of ingredient cost per menu item portion (BOM quantity × unit cost),
+compared against selling price to determine gross margin.
+Order Throttling
+A system rule that limits the number of concurrent orders assigned to a single Chef to
+prevent overload and quality degradation.
+RBAC
+Role-Based Access Control — a security model where system permissions are
+assigned based on the user’s defined role.
+Atomic Transaction
+A database operation that is completed in full or not at all — ensuring inventory
+deductions either succeed entirely or are fully rolled back.
