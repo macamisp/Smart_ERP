@@ -189,9 +189,21 @@ app.put('/api/orders/:id/status', async (req, res) => {
         return res.json({ success: true, order: updatedOrder, message: 'Stock Depleted Atomically' });
     } else {
         // Just updating to IN_PROGRESS (Cooking)
+        const chefId = req.body.chefId || targetOrder.chefId;
+
+        if (chefId && status === 'IN_PROGRESS') {
+           const activeOrders = await prisma.order.count({
+              where: { chefId, status: 'IN_PROGRESS' }
+           });
+           // Request Requirement 4.3: Order Throttling
+           if (activeOrders >= 5) {
+              io.emit('dashboard_update', { event: 'chef_overload', chefId: chefId, message: 'Chef is assigned >= 5 orders (Overload)' });
+           }
+        }
+
         const updatedOrder = await prisma.order.update({
             where: { id: orderId },
-            data: { status },
+            data: { status, chefId: chefId },
             include: { items: { include: { menuItem: true } } }
         });
         io.to('kds_room').emit('order_status_updated', updatedOrder);
@@ -253,6 +265,18 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
+app.get('/api/inventory/reconciliations', async (req, res) => {
+  try {
+    const list = await prisma.stockReconciliation.findMany({
+      include: { ingredient: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 app.post('/api/inventory/waste', async (req, res) => {
   const { ingredientId, quantity, reason, loggedBy } = req.body;
 
@@ -276,6 +300,39 @@ app.post('/api/inventory/waste', async (req, res) => {
     res.json({ success: true, log: transaction[0] });
   } catch (error) {
     res.status(500).json({ error: 'Failed to log waste' });
+  }
+});
+
+app.post('/api/inventory/reconcile', async (req, res) => {
+  const { ingredientId, physicalStock, loggedBy } = req.body;
+
+  try {
+    const ingredient = await prisma.ingredient.findUnique({ where: { id: parseInt(ingredientId) } });
+    if (!ingredient) return res.status(404).json({ error: 'Not found' });
+
+    const expectedStock = ingredient.currentStock;
+    const discrepancy = physicalStock - expectedStock;
+
+    const transaction = await prisma.$transaction([
+      prisma.stockReconciliation.create({
+        data: {
+          ingredientId: parseInt(ingredientId),
+          expectedStock,
+          physicalStock,
+          discrepancy,
+          loggedBy
+        }
+      }),
+      prisma.ingredient.update({
+        where: { id: parseInt(ingredientId) },
+        data: { currentStock: physicalStock }
+      })
+    ]);
+
+    io.emit('dashboard_update', { event: 'stock_reconciled', ingredientId });
+    res.json({ success: true, reconciliation: transaction[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Reconciliation failed' });
   }
 });
 
@@ -337,6 +394,98 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', component: 'ERP Core Engine v2' });
 });
 
+// ==========================================
+// 7. FATIGUE MONITORING (BRD 4.3)
+// ==========================================
+app.post('/api/staff/clock', async (req, res) => {
+   const { chefId, isClockIn } = req.body;
+   try {
+      if (isClockIn) {
+         // Create a new shift log or just clock them in
+         const user = await prisma.user.update({
+            where: { id: chefId },
+            data: { clockInTime: new Date() }
+         });
+         await prisma.shiftLog.create({
+            data: { userId: chefId, clockInTime: new Date() }
+         });
+         res.json({ success: true, user });
+      } else {
+         const user = await prisma.user.findUnique({ where: { id: chefId } });
+         if (user?.clockInTime) {
+             const hoursWorked = (new Date().getTime() - user.clockInTime.getTime()) / 3600000;
+             // close the most recent shift log without clockOutTime
+             const openShift = await prisma.shiftLog.findFirst({
+                 where: { userId: chefId, clockOutTime: null },
+                 orderBy: { clockInTime: 'desc' }
+             });
+             
+             if (openShift) {
+                 await prisma.shiftLog.update({
+                     where: { id: openShift.id },
+                     data: { clockOutTime: new Date(), hoursWorked }
+                 });
+             }
+             
+             await prisma.user.update({
+                 where: { id: chefId },
+                 data: { clockInTime: null }
+             });
+         }
+         res.json({ success: true });
+      }
+   } catch (error) {
+      res.status(500).json({ error: 'Failed to update clock status' });
+   }
+});
+
+app.get('/api/staff/fatigue', async (req, res) => {
+   try {
+      const chefs = await prisma.user.findMany({
+         where: { role: 'CHEF', clockInTime: { not: null } }
+      });
+      
+      const fatigueAlerts = [];
+      const thresholdHours = 4; // BRD Default: 4 hours
+      
+      for (const chef of chefs) {
+         if (chef.clockInTime) {
+            const hoursOnClock = (new Date().getTime() - chef.clockInTime.getTime()) / 3600000;
+            if (hoursOnClock >= thresholdHours) {
+               fatigueAlerts.push({
+                  type: 'FATIGUE',
+                  message: `Chef ${chef.name} reached break limit (${hoursOnClock.toFixed(1)} hrs continuous).`,
+                  chefId: chef.id
+               });
+            }
+         }
+      }
+      res.json({ alerts: fatigueAlerts });
+   } catch (error) {
+      res.status(500).json({ error: 'Failed' });
+   }
+});
+
+app.get('/api/staff/chefs', async (req, res) => {
+   try {
+      const chefs = await prisma.user.findMany({ where: { role: 'CHEF' } });
+      res.json(chefs);
+   } catch (error) {
+      res.status(500).json({ error: 'Failed' });
+   }
+});
+
+app.get('/api/staff/reports', async (req, res) => {
+   try {
+      const logs = await prisma.shiftLog.findMany({
+         include: { user: true },
+         orderBy: { clockInTime: 'desc' }
+      });
+      res.json({ logs });
+   } catch (error) {
+      res.status(500).json({ error: 'Failed to get logs' });
+   }
+});
 
 // Real-time connections
 io.on('connection', (socket) => {

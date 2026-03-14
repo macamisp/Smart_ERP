@@ -3,19 +3,22 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  role      String   @default("GUEST") // GUEST, CHEF, MANAGER, ADMIN
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Order     Order[]
+  id          Int       @id @default(autoincrement())
+  name        String
+  email       String    @unique
+  role        String    @default("GUEST") // GUEST, CHEF, MANAGER, ADMIN
+  password    String
+  clockInTime DateTime? // For Fatigue Monitoring
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  Order       Order[]   @relation("GuestOrders")
+  ChefOrders  Order[]   @relation("ChefOrders")
+  ShiftLogs   ShiftLog[]
 }
 
 model Ingredient {
@@ -29,6 +32,7 @@ model Ingredient {
   updatedAt       DateTime @updatedAt
   BillOfMaterial  BillOfMaterial[]
   WasteLog        WasteLog[]
+  Reconciliations StockReconciliation[]
 }
 
 model MenuItem {
@@ -65,13 +69,15 @@ model BillOfMaterial {
 model Order {
   id          Int         @id @default(autoincrement())
   userId      Int?        // Optional guest account relation
+  chefId      Int?        // Assigned Chef
   tableNumber Int?
   status      String      @default("QUEUED") // QUEUED, IN_PROGRESS, COMPLETED, CANCELLED
   totalAmount Float       @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  user        User?       @relation(fields: [userId], references: [id])
+  user        User?       @relation("GuestOrders", fields: [userId], references: [id])
+  chef        User?       @relation("ChefOrders", fields: [chefId], references: [id])
   items       OrderItem[]
 }
 
@@ -103,5 +109,28 @@ model Alert {
   message      String
   isRead       Boolean  @default(false)
   createdAt    DateTime @default(now())
+}
+
+model StockReconciliation {
+  id              Int        @id @default(autoincrement())
+  ingredientId    Int
+  expectedStock   Float
+  physicalStock   Float
+  discrepancy     Float
+  loggedBy        Int?
+  createdAt       DateTime   @default(now())
+  
+  ingredient      Ingredient @relation(fields: [ingredientId], references: [id])
+}
+
+model ShiftLog {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  clockInTime  DateTime
+  clockOutTime DateTime?
+  hoursWorked  Float?
+  ordersDone   Int        @default(0)
+  
+  user         User       @relation(fields: [userId], references: [id])
 }
 

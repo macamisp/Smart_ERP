@@ -28,10 +28,13 @@ type Order = {
 
 export default function KDS() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [chefs, setChefs] = useState<any[]>([]);
+  const [selectedChefId, setSelectedChefId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchKDS();
+    fetchChefs();
 
     const socket = io(SOCKET_URL);
     socket.emit('join_kds');
@@ -65,12 +68,27 @@ export default function KDS() {
     }
   };
 
+  const fetchChefs = async () => {
+    try {
+      const res = await fetch(`${API_URL}/staff/chefs`);
+      const data = await res.json();
+      setChefs(data);
+      if (data.length > 0) setSelectedChefId(data[0].id);
+    } catch (error) {
+      console.error('Failed to fetch chefs', error);
+    }
+  };
+
   const updateOrderStatus = async (id: number, status: 'IN_PROGRESS' | 'COMPLETED') => {
+    if (status === 'IN_PROGRESS' && !selectedChefId) {
+       alert('Please select a Chef first');
+       return;
+    }
     try {
       await fetch(`${API_URL}/orders/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, chefId: selectedChefId })
       });
       if (status === 'COMPLETED') {
         setOrders(prev => prev.filter(o => o.id !== id));
@@ -113,6 +131,17 @@ export default function KDS() {
             <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{orders.filter(o => o.status === 'QUEUED').length}</span>
             <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>QUEUED</span>
           </div>
+
+          <div className="glass-panel" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>ACTIVE CHEF:</span>
+             <select 
+               value={selectedChefId || ''} 
+               onChange={(e) => setSelectedChefId(parseInt(e.target.value))}
+               style={{ background: 'transparent', color: 'white', border: 'none', fontWeight: 'bold', outline: 'none' }}
+             >
+               {chefs.map(c => <option key={c.id} value={c.id} style={{ color: 'black' }}>{c.name}</option>)}
+             </select>
+          </div>
         </div>
       </div>
 
@@ -143,6 +172,7 @@ export default function KDS() {
                        <span style={{ fontWeight: 'bold', color: 'var(--accent-color)' }}>{item.quantity}x</span>
                        <span>{item.menuItem.name} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>({item.menuItem.size})</span></span>
                     </div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Tgt: {item.menuItem.prepTimeMins}m</span>
                   </div>
                 ))}
               </div>
